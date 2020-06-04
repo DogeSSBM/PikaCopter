@@ -23,7 +23,7 @@ typedef union{
 				u8 high;
 			};
 		}x;
-		
+
 		union{
 			u16 full;
 			struct{
@@ -31,7 +31,7 @@ typedef union{
 				u8 high;
 			};
 		}y;
-		
+
 		union{
 			u16 full;
 			struct{
@@ -39,7 +39,7 @@ typedef union{
 				u8 high;
 			};
 		}z;
-		
+
 	};
 }GyroData;
 
@@ -55,6 +55,8 @@ void gyroRead(GyroData *data)
 
 void setup()
 {
+	GyroData data = {0};
+	gyroRead(&data);
 
 }
 
