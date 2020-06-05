@@ -3,7 +3,7 @@
 // #define ACCL_ADDR
 
 #define GYRO_CTRL1_ADDR	0x20
-#define GYRO_CTRL1_DATA	0b0100111
+#define GYRO_CTRL1_DATA	0x0F
 // Bits from left to right:
 // Output Data Rate bit 1, Output Data Rate bit 0,
 // Bandwidth selection bit 1, Bandwidth selection bit 0,
@@ -35,30 +35,30 @@
 #define OUT_Z_H 		0x2D
 
 typedef union{
-	u8 arr8[6];
-	u16 arr16[3];
+	i8 arr8[6];
+	i16 arr16[3];
 	struct{
 		union{
-			u16 full;
+			i16 full;
 			struct{
-				u8 high;
-				u8 low;
+				i8 high;
+				i8 low;
 			};
 		}x;
 
 		union{
-			u16 full;
+			i16 full;
 			struct{
-				u8 high;
-				u8 low;
+				i8 high;
+				i8 low;
 			};
 		}y;
 
 		union{
-			u16 full;
+			i16 full;
 			struct{
-				u8 high;
-				u8 low;
+				i8 high;
+				i8 low;
 			};
 		}z;
 
@@ -76,13 +76,6 @@ void gyroWrite8(const u8 reg, const u8 data)
 	Wire.endTransmission();
 }
 
-void gyroNormalize(GyroData *data, GyroData *calibrationOffset)
-{
-	for(u8 i = 0; i < 6; i++){
-		data->arr8[i] -= calibrationOffset->arr8[i];
-	}
-}
-
 void gyroReadXYZ(GyroData *data)
 {
 	Wire.beginTransmission(GYRO_ADDR);
@@ -93,19 +86,17 @@ void gyroReadXYZ(GyroData *data)
 	for(u8 i = 0; i < 6; i++){
 		data->arr8[i] = Wire.read();
 	}
-	gyroNormalize(data, &calibrationData);
+	for(u8 i = 0; i < 3; i++){
+		data->arr16[i] -= calibrationData.arr16[i];
+	}
 }
 
-void gyroAverage4(GyroData **fourReads, GyroData *averages)
+void gyroAverageReads(GyroData *reads)
 {
-	u64 axisTotals[3] = {0};
-	for(u8 read1 = 0; read1 < 4; read1++){
+	for(u8 read1 = 0; read1 < 32; read1++){
 		for(u8 axis = 0; axis < 3; axis++){
-			axisTotals[axis] += fourReads[read1]->arr16[axis];
+			calibrationData.arr16[axis] += reads[read1].arr16[axis]/32;
 		}
-	}
-	for(u8 axis = 0; axis < 3; axis++){
-		averages->arr16[axis] = axisTotals[axis]/4;
 	}
 }
 
@@ -114,12 +105,12 @@ void gyroInit(void)
 	Wire.begin();
 	gyroWrite8(GYRO_CTRL1_ADDR, GYRO_CTRL1_DATA);
 	gyroWrite8(GYRO_CTRL4_ADDR, GYRO_CTRL4_DATA);
-	GyroData calibrationReads[4] = {0};
-	GyroData calibrationAverages = {0};
-	for(u8 read1 = 0; read1 < 4; read1++){
+	GyroData calibrationReads[32] = {0};
+	//GyroData calibrationAverages = {0};
+	for(u8 read1 = 0; read1 < 32; read1++){
 		gyroReadXYZ(&calibrationReads[read1]);
 	}
-
+	gyroAverageReads(calibrationReads);
 
 }
 
@@ -130,23 +121,26 @@ void gyroPrintData(GyroData *data)
 		"Y: ",
 		"Z: "
 	};
+	Serial.println("RAW\t\t\t SHITTY DegPS: ");
 	for(u8 i = 0; i < 3; i++){
 		Serial.print(labels[i]);
-		Serial.println(data->arr16[i]);
+		Serial.print(data->arr16[i]);
+		Serial.print("\t\t\t");
+		Serial.println(data->arr16[i]/57);
 	}
 }
 
 void setup()
 {
-  Serial.begin(9600);
-  GyroData info;
-  gyroInit();
+	Serial.begin(9600);
+	GyroData info;
+	gyroInit();
 
-  while(1){
-    gyroReadXYZ(&info);
-    gyroPrintData(&info);
-    delay(500);
-  }
+	while(1){
+		gyroReadXYZ(&info);
+		gyroPrintData(&info);
+		delay(500);
+	}
 
 }
 
