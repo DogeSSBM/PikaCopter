@@ -1,5 +1,5 @@
 #include "Includes.h"
-#define GYRO_ADDR		0xD3
+#define GYRO_ADDR		0x69
 // #define ACCL_ADDR
 
 #define GYRO_CTRL1_ADDR	0x20
@@ -18,7 +18,7 @@
 // Unused
 
 #define GYRO_CTRL4_ADDR	0x23
-#define GYRO_CTRL4_DATA	0b10000001
+#define GYRO_CTRL4_DATA	0b10000000
 // Bits from left to right:
 // Block Data Update, 0=LSB 1=MSB,
 // Full Scale selection bit 1, Full Scale selection bit 0
@@ -79,7 +79,7 @@ void gyroWrite8(const u8 reg, const u8 data)
 void gyroNormalize(GyroData *data, GyroData *calibrationOffset)
 {
 	for(u8 i = 0; i < 6; i++){
-		data->arr[i] -= calibrationOffset->arr[i];
+		data->arr8[i] -= calibrationOffset->arr8[i];
 	}
 }
 
@@ -91,17 +91,17 @@ void gyroReadXYZ(GyroData *data)
 	Wire.requestFrom(GYRO_ADDR, 6);
 	while(Wire.available()<6);
 	for(u8 i = 0; i < 6; i++){
-		data->arr[i] = Wire.read();
+		data->arr8[i] = Wire.read();
 	}
-	gyroNormalize(data, calibrationData);
+	gyroNormalize(data, &calibrationData);
 }
 
 void gyroAverage4(GyroData **fourReads, GyroData *averages)
 {
-	u64 axisTotals[3]; = {0};
-	for(u8 read = 0; read < 4; read++){
+	u64 axisTotals[3] = {0};
+	for(u8 read1 = 0; read1 < 4; read1++){
 		for(u8 axis = 0; axis < 3; axis++){
-			axisTotals[axis] += fourReads[read]->arr16[axis];
+			axisTotals[axis] += fourReads[read1]->arr16[axis];
 		}
 	}
 	for(u8 axis = 0; axis < 3; axis++){
@@ -112,12 +112,12 @@ void gyroAverage4(GyroData **fourReads, GyroData *averages)
 void gyroInit(void)
 {
 	Wire.begin();
-	gyroWrite8(GYRO_CTRL_1, GYRO_CTRL_1_DAT);
-	gyroWrite8(GYRO_CTRL_4, GYRO_CTRL_4_DAT);
+	gyroWrite8(GYRO_CTRL1_ADDR, GYRO_CTRL1_DATA);
+	gyroWrite8(GYRO_CTRL4_ADDR, GYRO_CTRL4_DATA);
 	GyroData calibrationReads[4] = {0};
 	GyroData calibrationAverages = {0};
-	for(u8 read = 0; read < 4; read++){
-		gyroReadXYZ(&calibrationReads[read]);
+	for(u8 read1 = 0; read1 < 4; read1++){
+		gyroReadXYZ(&calibrationReads[read1]);
 	}
 
 
@@ -130,15 +130,23 @@ void gyroPrintData(GyroData *data)
 		"Y: ",
 		"Z: "
 	};
-	for(u8 i = 0; i < 6; i++){
-		const u16
-		Serial.print();
-		Serial.println(data->arr[i]);
+	for(u8 i = 0; i < 3; i++){
+		Serial.print(labels[i]);
+		Serial.println(data->arr16[i]);
 	}
 }
 
 void setup()
 {
+  Serial.begin(9600);
+  GyroData info;
+  gyroInit();
+
+  while(1){
+    gyroReadXYZ(&info);
+    gyroPrintData(&info);
+    delay(500);
+  }
 
 }
 
